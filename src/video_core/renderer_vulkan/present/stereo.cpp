@@ -21,12 +21,13 @@ constexpr VkFormat OutputFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 // Matches the push constant block in vulkan_stereo_sbs.frag.
 struct StereoPushConstants {
     std::array<f32, 4> crop;
+    std::array<f32, 4> depth_region;
     f32 separation;
     f32 inv_conv;
     s32 depth_mode;
     s32 flags;
 };
-static_assert(sizeof(StereoPushConstants) == 32);
+static_assert(sizeof(StereoPushConstants) == 48);
 
 } // Anonymous namespace
 
@@ -108,7 +109,8 @@ void StereoPass::ClearImages(Scheduler& scheduler) {
 
 void StereoPass::Draw(const Device& device, Scheduler& scheduler, size_t image_index,
                       VkImage* inout_image, VkImageView* inout_image_view,
-                      VkImageView depth_view, const Common::Rectangle<f32>& crop) {
+                      VkImageView depth_view, const std::array<f32, 4>& depth_region,
+                      const Common::Rectangle<f32>& crop) {
     const Image& image{m_images[image_index]};
     const VkImage input_image{*inout_image};
     const VkImage output_image{*image.image};
@@ -122,6 +124,7 @@ void StereoPass::Draw(const Device& device, Scheduler& scheduler, size_t image_i
     const auto& values = Settings::values;
     const StereoPushConstants push{
         .crop = {crop.left, crop.top, crop.right, crop.bottom},
+        .depth_region = depth_region,
         // The setting is total disparity as a percentage of the screen; the shader works in
         // eye widths, which for side-by-side is the same fraction.
         .separation = f32(values.stereo_separation.GetValue()) / 100.0f,

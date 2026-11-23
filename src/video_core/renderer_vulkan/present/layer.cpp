@@ -156,8 +156,10 @@ void Layer::ConfigureDraw(const Device& device, PresentPushConstants* out_push_c
             stereo.emplace(device, memory_allocator, image_count, stereo_extent);
         }
         const VkImageView depth_view = texture_info ? texture_info->depth_image_view : VkImageView{};
+        const std::array<f32, 4> depth_region =
+            texture_info ? texture_info->depth_region : std::array<f32, 4>{0.0f, 0.0f, 1.0f, 1.0f};
         stereo->Draw(device, scheduler, image_index, &source_image, &source_image_view, depth_view,
-                     crop_rect);
+                     depth_region, crop_rect);
         crop_rect = {0, 0, 1, 1};
         render_extent = stereo_extent;
     } else if (stereo) {

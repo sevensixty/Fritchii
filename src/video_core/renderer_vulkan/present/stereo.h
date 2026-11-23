@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <array>
+
 #include "common/math_util.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
@@ -27,7 +29,7 @@ public:
     /// depth_view may be null, which gives both eyes the same image.
     void Draw(const Device& device, Scheduler& scheduler, size_t image_index,
               VkImage* inout_image, VkImageView* inout_image_view, VkImageView depth_view,
-              const Common::Rectangle<f32>& crop);
+              const std::array<f32, 4>& depth_region, const Common::Rectangle<f32>& crop);
 
 private:
     struct Image {

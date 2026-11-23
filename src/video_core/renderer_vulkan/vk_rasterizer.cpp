@@ -2015,7 +2015,7 @@ std::optional<FramebufferTextureInfo> RasterizerVulkan::AccelerateDisplay(
     info.scaled_width = scaled ? resolution.ScaleUp(info.width) : info.width;
     info.scaled_height = scaled ? resolution.ScaleUp(info.height) : info.height;
     if (Settings::values.stereo_3d.GetValue() != Settings::Stereo3D::Off) {
-        if (ImageView* const depth = texture_cache.TakeStereoDepthView()) {
+        if (ImageView* const depth = texture_cache.TakeStereoDepthView(info.depth_region)) {
             info.depth_image_view = depth->DepthView();
         }
     }

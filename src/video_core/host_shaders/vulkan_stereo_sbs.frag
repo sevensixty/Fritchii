@@ -17,6 +17,7 @@ layout(binding = 1) uniform sampler2D depth_texture;
 
 layout(push_constant) uniform PushConstants {
     vec4 crop;          // left, top, right, bottom of the source, normalized
+    vec4 depth_region;  // part of the depth buffer the frame drew to, normalized
     float separation;   // total background disparity, fraction of eye width
     float inv_conv;     // near / convergence distance: w of the screen plane
     int depth_mode;     // 0 auto, 1 standard (near = 0), 2 reversed (near = 1), 3 show depth
@@ -32,10 +33,13 @@ const float LIMIT_NEAR = 0.04;
 bool reversed;
 
 float InverseDepth(vec2 uv) {
+    // Colour and depth can have different sizes: map through the frame's position in each.
+    vec2 frame = (uv - crop.xy) / (crop.zw - crop.xy);
     if ((flags & 4) != 0) {
-        uv.y = 1.0 - uv.y;
+        frame.y = 1.0 - frame.y;
     }
-    const float d = textureLod(depth_texture, uv, 0.0).r;
+    const vec2 depth_uv = depth_region.xy + frame * (depth_region.zw - depth_region.xy);
+    const float d = textureLod(depth_texture, depth_uv, 0.0).r;
     return reversed ? d : 1.0 - d;
 }
 
@@ -53,7 +57,8 @@ bool DetectReversed() {
     float sum = 0.0;
     for (int y = 0; y < 3; ++y) {
         for (int x = 0; x < 3; ++x) {
-            sum += textureLod(depth_texture, vec2(0.25 + 0.25 * x, 0.25 + 0.25 * y), 0.0).r;
+            const vec2 p = vec2(0.25 + 0.25 * x, 0.25 + 0.25 * y);
+            sum += textureLod(depth_texture, mix(depth_region.xy, depth_region.zw, p), 0.0).r;
         }
     }
     return sum / 9.0 < 0.5;
