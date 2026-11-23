@@ -31,6 +31,12 @@ const int STEPS = 48;
 const float LIMIT_NEAR = 0.04;
 
 bool reversed;
+// Pixels left at the cleared depth value. Some games (Super Mario Bros. Wonder) draw their
+// characters without writing depth, so the character keeps the clear value and would be sent
+// behind everything. When only part of the frame is cleared, those pixels are put at the
+// screen plane instead. When most of it is cleared, the clear value is the sky: keep it far.
+const float EMPTY = 2e-5;
+bool empty_at_screen;
 
 float InverseDepth(vec2 uv) {
     // Colour and depth can have different sizes: map through the frame's position in each.
@@ -45,23 +51,40 @@ float InverseDepth(vec2 uv) {
 
 // Disparity of the source pixel at uv, toward this eye's near direction, in eye widths.
 float Parallax(vec2 uv) {
-    const float ratio = InverseDepth(uv) / inv_conv;
+    const float w = InverseDepth(uv);
+    if (empty_at_screen && w < EMPTY) {
+        return 0.0;
+    }
+    const float ratio = w / inv_conv;
     return clamp(separation * (ratio - 1.0) * 0.5, -separation * 0.5, LIMIT_NEAR);
 }
 
+float DepthSample(int index) {
+    const vec2 p = vec2(0.25 + 0.25 * float(index % 3), 0.25 + 0.25 * float(index / 3));
+    return textureLod(depth_texture, mix(depth_region.xy, depth_region.zw, p), 0.0).r;
+}
+
 bool DetectReversed() {
+    bool result;
     if (depth_mode == 1 || depth_mode == 2) {
-        return depth_mode == 2;
-    }
-    // Most of a frame is far away: far depth reads near 1 in a standard buffer, near 0 reversed.
-    float sum = 0.0;
-    for (int y = 0; y < 3; ++y) {
-        for (int x = 0; x < 3; ++x) {
-            const vec2 p = vec2(0.25 + 0.25 * x, 0.25 + 0.25 * y);
-            sum += textureLod(depth_texture, mix(depth_region.xy, depth_region.zw, p), 0.0).r;
+        result = depth_mode == 2;
+    } else {
+        // Most of a frame is far away: far depth reads near 1 in a standard buffer, near 0
+        // reversed.
+        float sum = 0.0;
+        for (int i = 0; i < 9; ++i) {
+            sum += DepthSample(i);
         }
+        result = sum / 9.0 < 0.5;
     }
-    return sum / 9.0 < 0.5;
+    // Decide how to treat cleared pixels from the same samples.
+    int empty = 0;
+    for (int i = 0; i < 9; ++i) {
+        const float d = DepthSample(i);
+        empty += (result ? d : 1.0 - d) < EMPTY ? 1 : 0;
+    }
+    empty_at_screen = empty <= 2;
+    return result;
 }
 
 void main() {
@@ -79,7 +102,10 @@ void main() {
     vec2 source = target;
     if ((flags & 1) != 0 && depth_mode == 3) {
         reversed = DetectReversed();
-        color = vec4(vec3(clamp(InverseDepth(target) / inv_conv, 0.0, 1.0)), 1.0);
+        const float w = InverseDepth(target);
+        // Cleared pixels show red when they are being put at the screen plane.
+        color = empty_at_screen && w < EMPTY ? vec4(0.8, 0.1, 0.1, 1.0)
+                                             : vec4(vec3(clamp(w / inv_conv, 0.0, 1.0)), 1.0);
         return;
     }
     if ((flags & 1) != 0 && separation > 0.0) {
