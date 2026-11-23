@@ -137,7 +137,63 @@ double Nx2KeyClockSeconds() {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
 }
 
+namespace {
+// Live stereo 3D tuning, so depth problems can be looked at without restarting the game.
+// F5/F6 depth, F7/F8 convergence, F9 depth format, F10 swap eyes, F11 stereo on/off.
+// The values are saved to the config when the emulator exits.
+bool HandleStereoHotkey(int key) {
+    auto& v = Settings::values;
+    static Settings::Stereo3D last_mode = Settings::Stereo3D::FullSbs;
+    const auto convergence_step = [](int value) { return value < 10 ? 1 : value < 50 ? 5 : 25; };
+    switch (key) {
+    case SDL_SCANCODE_F5:
+        v.stereo_separation.SetValue(v.stereo_separation.GetValue() - 1);
+        break;
+    case SDL_SCANCODE_F6:
+        v.stereo_separation.SetValue(v.stereo_separation.GetValue() + 1);
+        break;
+    case SDL_SCANCODE_F7: {
+        const int value = v.stereo_convergence.GetValue();
+        v.stereo_convergence.SetValue(value - convergence_step(value - 1));
+        break;
+    }
+    case SDL_SCANCODE_F8: {
+        const int value = v.stereo_convergence.GetValue();
+        v.stereo_convergence.SetValue(value + convergence_step(value));
+        break;
+    }
+    case SDL_SCANCODE_F9:
+        v.stereo_depth.SetValue(static_cast<Settings::StereoDepth>(
+            (static_cast<int>(v.stereo_depth.GetValue()) + 1) % 4));
+        break;
+    case SDL_SCANCODE_F10:
+        v.stereo_swap_eyes.SetValue(!v.stereo_swap_eyes.GetValue());
+        break;
+    case SDL_SCANCODE_F11:
+        if (v.stereo_3d.GetValue() == Settings::Stereo3D::Off) {
+            v.stereo_3d.SetValue(last_mode);
+        } else {
+            last_mode = v.stereo_3d.GetValue();
+            v.stereo_3d.SetValue(Settings::Stereo3D::Off);
+        }
+        break;
+    default:
+        return false;
+    }
+    static constexpr const char* depth_names[] = {"auto", "standard", "reversed", "show depth"};
+    LOG_INFO(Frontend, "Stereo: mode={} depth={} convergence={} format={} swap={}",
+             static_cast<int>(v.stereo_3d.GetValue()), v.stereo_separation.GetValue(),
+             v.stereo_convergence.GetValue(),
+             depth_names[static_cast<int>(v.stereo_depth.GetValue()) % 4],
+             v.stereo_swap_eyes.GetValue());
+    return true;
+}
+} // namespace
+
 void EmuWindow_SDL3::OnKeyEvent(int key, u8 state) {
+    if (state != 0 && HandleStereoHotkey(key)) {
+        return;
+    }
     // EDEN_NX2_KEY_RECORD=<file>: append each press/release ("seconds:code", "seconds:-code").
     static std::FILE* const record = [] {
         const char* path = std::getenv("EDEN_NX2_KEY_RECORD");
