@@ -46,6 +46,8 @@ struct FramebufferTextureInfo {
     u32 height{};
     u32 scaled_width{};
     u32 scaled_height{};
+    // The frame's depth buffer for stereo 3D, when one was found.
+    VkImageView depth_image_view{};
 };
 
 class BlitScreen {

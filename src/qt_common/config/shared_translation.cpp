@@ -165,6 +165,21 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
     INSERT(Settings, anti_aliasing, tr("Anti-Aliasing Method:"),
            tr("The anti-aliasing method to use.\nSMAA offers the best quality.\nFXAA "
               "can produce a more stable picture in lower resolutions."));
+    INSERT(Settings, stereo_3d, tr("Stereo 3D:"),
+           tr("Outputs side-by-side 3D for 3D displays and glasses, built from the game's depth "
+              "buffer.\nFull SBS gives each eye a full-size image (use a 32:9 window such as "
+              "3840x1080 with the Stretch aspect ratio).\nHalf SBS squeezes both eyes into a "
+              "normal 16:9 frame."));
+    INSERT(Settings, stereo_separation, tr("Stereo depth (separation %):"),
+           tr("How deep the 3D effect is: the distance between the eyes' images of the far "
+              "background, as a percentage of screen width. 3-5 is comfortable."));
+    INSERT(Settings, stereo_convergence, tr("Stereo convergence:"),
+           tr("Where the screen plane sits. Higher values pull more of the scene out of the "
+              "screen."));
+    INSERT(Settings, stereo_depth, tr("Stereo depth buffer format:"),
+           tr("How the game stores depth. Try Standard or Reversed if the 3D looks inside out."));
+    INSERT(Settings, stereo_swap_eyes, tr("Swap stereo eyes"),
+           tr("Swaps the left and right images."));
     INSERT(Settings, post_shader_chain, QString(), QString());
     INSERT(Settings, post_shader_preset, QString(), QString());
     INSERT(Settings, post_shader_enabled, tr("Enable post-processing effects"),
@@ -535,6 +550,18 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent) {
                               PAIR(AntiAliasing, None, tr("None")),
                               PAIR(AntiAliasing, Fxaa, tr("FXAA")),
                               PAIR(AntiAliasing, Smaa, tr("SMAA")),
+                          }});
+    translations->insert({Settings::EnumMetadata<Settings::Stereo3D>::Index(),
+                          {
+                              PAIR(Stereo3D, Off, tr("Off")),
+                              PAIR(Stereo3D, HalfSbs, tr("Half Side-by-Side")),
+                              PAIR(Stereo3D, FullSbs, tr("Full Side-by-Side")),
+                          }});
+    translations->insert({Settings::EnumMetadata<Settings::StereoDepth>::Index(),
+                          {
+                              PAIR(StereoDepth, Auto, tr("Auto")),
+                              PAIR(StereoDepth, Standard, tr("Standard")),
+                              PAIR(StereoDepth, Reversed, tr("Reversed")),
                           }});
     translations->insert({Settings::EnumMetadata<Settings::AspectRatio>::Index(),
                           {

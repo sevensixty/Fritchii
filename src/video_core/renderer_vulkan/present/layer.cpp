@@ -137,10 +137,33 @@ void Layer::ConfigureDraw(const Device& device, PresentPushConstants* out_push_c
 #endif
 
     auto crop_rect = Tegra::NormalizeCrop(framebuffer, texture_width, texture_height);
-    const VkExtent2D render_extent{
+    VkExtent2D render_extent{
         .width = scaled_width,
         .height = scaled_height,
     };
+
+    const auto stereo_mode = Settings::values.stereo_3d.GetValue();
+    if (stereo_mode != Settings::Stereo3D::Off && !is_applet) {
+        // Full side-by-side keeps each eye at full width; half squeezes both into one frame.
+        const VkExtent2D stereo_extent{
+            .width = stereo_mode == Settings::Stereo3D::FullSbs ? scaled_width * 2 : scaled_width,
+            .height = scaled_height,
+        };
+        if (!stereo || stereo->Extent().width != stereo_extent.width ||
+            stereo->Extent().height != stereo_extent.height) {
+            // Earlier frames may still be reading the old images.
+            scheduler.Finish();
+            stereo.emplace(device, memory_allocator, image_count, stereo_extent);
+        }
+        const VkImageView depth_view = texture_info ? texture_info->depth_image_view : VkImageView{};
+        stereo->Draw(device, scheduler, image_index, &source_image, &source_image_view, depth_view,
+                     crop_rect);
+        crop_rect = {0, 0, 1, 1};
+        render_extent = stereo_extent;
+    } else if (stereo) {
+        scheduler.Finish();
+        stereo.reset();
+    }
 
     if (auto* fsr = std::get_if<FSR>(&sr_filter)) {
         source_image_view = fsr->Draw(device, scheduler, image_index, source_image, source_image_view, render_extent, crop_rect);

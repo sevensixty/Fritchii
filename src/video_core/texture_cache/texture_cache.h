@@ -825,6 +825,17 @@ void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
     if (depth_buffer_id) {
         rt_active_mask |= (1u << NUM_RT);
         rt_depth_image_id = slot_image_views[depth_buffer_id].image_id;
+        if (Settings::values.stereo_3d.GetValue() != Settings::Stereo3D::Off) {
+            // Shadow maps and other square targets are skipped; the scene's depth is the
+            // largest wide one.
+            const Extent3D size = slot_images[rt_depth_image_id].info.size;
+            const u64 area = u64(size.width) * size.height;
+            if (size.width > size.height && area >= stereo_frame_depth_area &&
+                slot_images[rt_depth_image_id].info.num_samples == 1) {
+                stereo_frame_depth_area = area;
+                stereo_frame_depth_view = depth_buffer_id;
+            }
+        }
     } else {
         rt_depth_image_id = ImageId{};
     }
@@ -1356,6 +1367,19 @@ bool TextureCache<P>::TemporalUpscale(const Tegra::Engines::Fermi2D::Surface& ds
             depth_view ? &slot_image_views[depth_view] : nullptr, render_size, jitter,
             motion_scale, use_history);
     }
+}
+
+template <class P>
+typename P::ImageView* TextureCache<P>::TakeStereoDepthView() {
+    if (stereo_frame_depth_view) {
+        stereo_depth_view = stereo_frame_depth_view;
+    }
+    stereo_frame_depth_view = ImageViewId{};
+    stereo_frame_depth_area = 0;
+    if (!stereo_depth_view) {
+        return nullptr;
+    }
+    return &slot_image_views[stereo_depth_view];
 }
 
 template <class P>
@@ -2244,6 +2268,13 @@ void TextureCache<P>::InvalidateScale(Image& image) {
         std::ranges::replace(render_targets.color_buffer_ids, image_view_id, ImageViewId{});
         if (render_targets.depth_buffer_id == image_view_id) {
             render_targets.depth_buffer_id = ImageViewId{};
+        }
+        if (stereo_frame_depth_view == image_view_id) {
+            stereo_frame_depth_view = ImageViewId{};
+            stereo_frame_depth_area = 0;
+        }
+        if (stereo_depth_view == image_view_id) {
+            stereo_depth_view = ImageViewId{};
         }
     }
     RemoveImageViewReferences(image_view_ids);
@@ -3433,6 +3464,13 @@ void TextureCache<P>::DeleteImage(ImageId image_id, bool immediate_delete) {
         std::ranges::replace(render_targets.color_buffer_ids, image_view_id, ImageViewId{});
         if (render_targets.depth_buffer_id == image_view_id) {
             render_targets.depth_buffer_id = ImageViewId{};
+        }
+        if (stereo_frame_depth_view == image_view_id) {
+            stereo_frame_depth_view = ImageViewId{};
+            stereo_frame_depth_area = 0;
+        }
+        if (stereo_depth_view == image_view_id) {
+            stereo_depth_view = ImageViewId{};
         }
     }
     RemoveImageViewReferences(image_view_ids);

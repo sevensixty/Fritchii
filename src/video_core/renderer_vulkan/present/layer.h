@@ -20,6 +20,7 @@
 #include "video_core/renderer_vulkan/present/post_process.h"
 #endif
 #include "video_core/renderer_vulkan/present/smaa.h"
+#include "video_core/renderer_vulkan/present/stereo.h"
 
 namespace Layout {
 struct FramebufferLayout;
@@ -102,6 +103,7 @@ private:
     Settings::AntiAliasing anti_alias_setting{};
     std::variant<std::monostate, FXAA, SMAA> anti_alias{};
     std::variant<std::monostate, SGSR, FSR, FSR3> sr_filter{};
+    std::optional<StereoPass> stereo{};
 #ifdef HAS_RESHADE
     std::optional<PostProcessChain> post_process{};
     u64 post_process_generation{};
