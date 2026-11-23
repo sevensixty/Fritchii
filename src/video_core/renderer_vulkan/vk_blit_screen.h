@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <array>
 #include <list>
 #include <memory>
 
@@ -46,6 +47,10 @@ struct FramebufferTextureInfo {
     u32 height{};
     u32 scaled_width{};
     u32 scaled_height{};
+    // The frame's depth buffer for stereo 3D, when one was found.
+    VkImageView depth_image_view{};
+    // The part of the depth buffer the frame drew to: left, top, right, bottom, normalized.
+    std::array<f32, 4> depth_region{0.0f, 0.0f, 1.0f, 1.0f};
 };
 
 class BlitScreen {

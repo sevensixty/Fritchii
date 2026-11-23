@@ -309,6 +309,12 @@ public:
     [[nodiscard]] std::pair<ImageView*, bool> TryFindFramebufferImageView(
         const Tegra::FramebufferConfig& config, DAddr cpu_addr);
 
+    /// The depth buffer of the frame being presented, for stereo 3D (nullptr when none).
+    /// region receives the part of it the frame drew to (left, top, right, bottom, normalized):
+    /// games with dynamic resolution draw into only part of a larger depth target.
+    /// Call once per presented frame: it also starts tracking the next one.
+    [[nodiscard]] ImageView* TakeStereoDepthView(std::array<f32, 4>& region);
+
     /// Return true when there are uncommitted images to be downloaded
     [[nodiscard]] bool HasUncommittedFlushes() const noexcept;
 
@@ -535,6 +541,14 @@ private:
     u32 rt_active_mask = 0;
     std::array<ImageId, 8> rt_image_id{};
     ImageId rt_depth_image_id{};
+    // Stereo 3D: the largest non-square depth target drawn this frame, and the last one found.
+    ImageViewId stereo_frame_depth_view{};
+    u64 stereo_frame_depth_area = 0;
+    ImageViewId stereo_depth_view{};
+    // Viewport bounds drawn into the tracked depth target this frame, in guest pixels.
+    std::array<f32, 4> stereo_frame_depth_bounds{};
+    std::array<f32, 4> stereo_depth_region{0.0f, 0.0f, 1.0f, 1.0f};
+    void TrackStereoDepthRegion(bool is_clear);
     u64 texture_bindings_serial = 0;
     u64 last_feedback_loop_serial = 0;
     u64 last_feedback_texture_serial = 0;

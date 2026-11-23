@@ -795,6 +795,7 @@ void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
         }
         const ImageViewId depth_buffer_id = render_targets.depth_buffer_id;
         PrepareImageView(depth_buffer_id, true, is_clear && IsFullClear(depth_buffer_id));
+        TrackStereoDepthRegion(is_clear);
         return;
     }
 
@@ -825,6 +826,20 @@ void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
     if (depth_buffer_id) {
         rt_active_mask |= (1u << NUM_RT);
         rt_depth_image_id = slot_image_views[depth_buffer_id].image_id;
+        if (Settings::values.stereo_3d.GetValue() != Settings::Stereo3D::Off) {
+            // Shadow maps and other square targets are skipped; the scene's depth is the
+            // largest wide one.
+            const Extent3D size = slot_images[rt_depth_image_id].info.size;
+            const u64 area = u64(size.width) * size.height;
+            if (size.width > size.height && area >= stereo_frame_depth_area &&
+                slot_images[rt_depth_image_id].info.num_samples == 1) {
+                if (stereo_frame_depth_view != depth_buffer_id) {
+                    stereo_frame_depth_bounds = {};
+                }
+                stereo_frame_depth_area = area;
+                stereo_frame_depth_view = depth_buffer_id;
+            }
+        }
     } else {
         rt_depth_image_id = ImageId{};
     }
@@ -849,6 +864,32 @@ void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
     }
 
     flags[Dirty::DepthBiasGlobal] = true;
+    TrackStereoDepthRegion(is_clear);
+}
+
+template <class P>
+void TextureCache<P>::TrackStereoDepthRegion(bool is_clear) {
+    // Clears often cover the whole allocation, so only draws say which part holds the scene.
+    if (is_clear || !stereo_frame_depth_view ||
+        render_targets.depth_buffer_id != stereo_frame_depth_view) {
+        return;
+    }
+    const auto& vp = maxwell3d->regs.viewport_transform[0];
+    const f32 half_w = std::abs(vp.scale_x);
+    const f32 half_h = std::abs(vp.scale_y);
+    if (half_w < 1.0f || half_h < 1.0f) {
+        return;
+    }
+    auto& b = stereo_frame_depth_bounds;
+    const bool empty = b[2] <= b[0] || b[3] <= b[1];
+    const std::array<f32, 4> draw{vp.translate_x - half_w, vp.translate_y - half_h,
+                                  vp.translate_x + half_w, vp.translate_y + half_h};
+    if (empty) {
+        b = draw;
+    } else {
+        b = {(std::min)(b[0], draw[0]), (std::min)(b[1], draw[1]), (std::max)(b[2], draw[2]),
+             (std::max)(b[3], draw[3])};
+    }
 }
 
 template <class P>
@@ -1356,6 +1397,43 @@ bool TextureCache<P>::TemporalUpscale(const Tegra::Engines::Fermi2D::Surface& ds
             depth_view ? &slot_image_views[depth_view] : nullptr, render_size, jitter,
             motion_scale, use_history);
     }
+}
+
+template <class P>
+typename P::ImageView* TextureCache<P>::TakeStereoDepthView(std::array<f32, 4>& region) {
+    if (stereo_frame_depth_view) {
+        stereo_depth_view = stereo_frame_depth_view;
+        const auto& b = stereo_frame_depth_bounds;
+        const ImageView& view = slot_image_views[stereo_frame_depth_view];
+        const Extent3D size = slot_images[view.image_id].info.size;
+        const f32 w = f32(size.width);
+        const f32 h = f32(size.height);
+        if (b[2] > b[0] && b[3] > b[1] && w > 0.0f && h > 0.0f) {
+            stereo_depth_region = {std::clamp(b[0] / w, 0.0f, 1.0f), std::clamp(b[1] / h, 0.0f, 1.0f),
+                                   std::clamp(b[2] / w, 0.0f, 1.0f), std::clamp(b[3] / h, 0.0f, 1.0f)};
+        } else {
+            stereo_depth_region = {0.0f, 0.0f, 1.0f, 1.0f};
+        }
+        static std::array<f32, 4> logged_region{};
+        static Extent3D logged_size{};
+        if (logged_size.width != size.width || logged_size.height != size.height ||
+            std::abs(logged_region[2] - stereo_depth_region[2]) > 0.02f ||
+            std::abs(logged_region[3] - stereo_depth_region[3]) > 0.02f) {
+            logged_region = stereo_depth_region;
+            logged_size = size;
+            LOG_INFO(HW_GPU, "Stereo depth: {}x{} region {:.3f},{:.3f} - {:.3f},{:.3f}",
+                     size.width, size.height, stereo_depth_region[0], stereo_depth_region[1],
+                     stereo_depth_region[2], stereo_depth_region[3]);
+        }
+    }
+    stereo_frame_depth_view = ImageViewId{};
+    stereo_frame_depth_area = 0;
+    stereo_frame_depth_bounds = {};
+    region = stereo_depth_region;
+    if (!stereo_depth_view) {
+        return nullptr;
+    }
+    return &slot_image_views[stereo_depth_view];
 }
 
 template <class P>
@@ -2244,6 +2322,14 @@ void TextureCache<P>::InvalidateScale(Image& image) {
         std::ranges::replace(render_targets.color_buffer_ids, image_view_id, ImageViewId{});
         if (render_targets.depth_buffer_id == image_view_id) {
             render_targets.depth_buffer_id = ImageViewId{};
+        }
+        if (stereo_frame_depth_view == image_view_id) {
+            stereo_frame_depth_view = ImageViewId{};
+            stereo_frame_depth_area = 0;
+        }
+        if (stereo_depth_view == image_view_id) {
+            stereo_depth_view = ImageViewId{};
+            stereo_depth_region = {0.0f, 0.0f, 1.0f, 1.0f};
         }
     }
     RemoveImageViewReferences(image_view_ids);
@@ -3433,6 +3519,14 @@ void TextureCache<P>::DeleteImage(ImageId image_id, bool immediate_delete) {
         std::ranges::replace(render_targets.color_buffer_ids, image_view_id, ImageViewId{});
         if (render_targets.depth_buffer_id == image_view_id) {
             render_targets.depth_buffer_id = ImageViewId{};
+        }
+        if (stereo_frame_depth_view == image_view_id) {
+            stereo_frame_depth_view = ImageViewId{};
+            stereo_frame_depth_area = 0;
+        }
+        if (stereo_depth_view == image_view_id) {
+            stereo_depth_view = ImageViewId{};
+            stereo_depth_region = {0.0f, 0.0f, 1.0f, 1.0f};
         }
     }
     RemoveImageViewReferences(image_view_ids);

@@ -400,6 +400,48 @@ struct Values {
                                                   true,
                                                   true};
 
+    // Side-by-side stereo 3D synthesized from the game's depth buffer at present time.
+    SwitchableSetting<Stereo3D, true> stereo_3d{linkage,
+                                               Stereo3D::Off,
+                                               "stereo_3d",
+                                               Category::Renderer,
+                                               Specialization::Default,
+                                               true,
+                                               true};
+    // Total background disparity as a percentage of screen width.
+    SwitchableSetting<int, true> stereo_separation{linkage,
+                                                   4,
+                                                   0,
+                                                   15,
+                                                   "stereo_separation",
+                                                   Category::Renderer,
+                                                   Specialization::Scalar,
+                                                   true,
+                                                   true};
+    // Screen-plane distance, in multiples of the game's near plane.
+    SwitchableSetting<int, true> stereo_convergence{linkage,
+                                                    20,
+                                                    1,
+                                                    500,
+                                                    "stereo_convergence",
+                                                    Category::Renderer,
+                                                    Specialization::Scalar,
+                                                    true,
+                                                    true};
+    SwitchableSetting<StereoDepth, true> stereo_depth{linkage,
+                                                      StereoDepth::Auto,
+                                                      "stereo_depth",
+                                                      Category::Renderer,
+                                                      Specialization::Default,
+                                                      true,
+                                                      true};
+    SwitchableSetting<bool> stereo_swap_eyes{linkage, false, "stereo_swap_eyes",
+                                             Category::Renderer, Specialization::Default, true,
+                                             true};
+    SwitchableSetting<bool> stereo_flip_depth{linkage, false, "stereo_flip_depth",
+                                              Category::Renderer, Specialization::Default, true,
+                                              true};
+
     SwitchableSetting<std::string> post_shader_chain{linkage,
                                                      std::string(),
                                                      "post_shader_chain",
