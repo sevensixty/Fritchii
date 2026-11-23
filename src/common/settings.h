@@ -438,6 +438,9 @@ struct Values {
     SwitchableSetting<bool> stereo_swap_eyes{linkage, false, "stereo_swap_eyes",
                                              Category::Renderer, Specialization::Default, true,
                                              true};
+    SwitchableSetting<bool> stereo_flip_depth{linkage, false, "stereo_flip_depth",
+                                              Category::Renderer, Specialization::Default, true,
+                                              true};
 
     SwitchableSetting<std::string> post_shader_chain{linkage,
                                                      std::string(),

@@ -127,7 +127,8 @@ void StereoPass::Draw(const Device& device, Scheduler& scheduler, size_t image_i
         .separation = f32(values.stereo_separation.GetValue()) / 100.0f,
         .inv_conv = 1.0f / f32((std::max)(values.stereo_convergence.GetValue(), 1)),
         .depth_mode = s32(values.stereo_depth.GetValue()),
-        .flags = (depth_view ? 1 : 0) | (values.stereo_swap_eyes.GetValue() ? 2 : 0),
+        .flags = (depth_view ? 1 : 0) | (values.stereo_swap_eyes.GetValue() ? 2 : 0) |
+                 (values.stereo_flip_depth.GetValue() ? 4 : 0),
     };
 
     ClearImages(scheduler);

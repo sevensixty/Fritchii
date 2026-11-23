@@ -181,6 +181,9 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
               "Show depth draws the depth buffer in grey, for checking that it lines up."));
     INSERT(Settings, stereo_swap_eyes, tr("Swap stereo eyes"),
            tr("Swaps the left and right images."));
+    INSERT(Settings, stereo_flip_depth, tr("Flip stereo depth vertically"),
+           tr("For games whose depth buffer is upside down compared to the picture: "
+              "characters show as see-through blobs mirrored from where they really are."));
     INSERT(Settings, post_shader_chain, QString(), QString());
     INSERT(Settings, post_shader_preset, QString(), QString());
     INSERT(Settings, post_shader_enabled, tr("Enable post-processing effects"),

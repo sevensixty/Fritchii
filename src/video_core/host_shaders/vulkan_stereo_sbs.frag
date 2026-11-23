@@ -20,7 +20,7 @@ layout(push_constant) uniform PushConstants {
     float separation;   // total background disparity, fraction of eye width
     float inv_conv;     // near / convergence distance: w of the screen plane
     int depth_mode;     // 0 auto, 1 standard (near = 0), 2 reversed (near = 1), 3 show depth
-    int flags;          // bit 0: depth present, bit 1: swap eyes
+    int flags;          // bit 0: depth present, bit 1: swap eyes, bit 2: flip depth vertically
 };
 
 // Candidate disparities searched per pixel, from nearest to farthest.
@@ -32,6 +32,9 @@ const float LIMIT_NEAR = 0.04;
 bool reversed;
 
 float InverseDepth(vec2 uv) {
+    if ((flags & 4) != 0) {
+        uv.y = 1.0 - uv.y;
+    }
     const float d = textureLod(depth_texture, uv, 0.0).r;
     return reversed ? d : 1.0 - d;
 }

@@ -139,7 +139,8 @@ double Nx2KeyClockSeconds() {
 
 namespace {
 // Live stereo 3D tuning, so depth problems can be looked at without restarting the game.
-// F5/F6 depth, F7/F8 convergence, F9 depth format, F10 swap eyes, F11 stereo on/off.
+// F5/F6 depth, F7/F8 convergence, F9 depth format, F10 swap eyes, F11 stereo on/off,
+// F12 flip the depth buffer vertically.
 // The values are saved to the config when the emulator exits.
 bool HandleStereoHotkey(int key) {
     auto& v = Settings::values;
@@ -169,6 +170,9 @@ bool HandleStereoHotkey(int key) {
     case SDL_SCANCODE_F10:
         v.stereo_swap_eyes.SetValue(!v.stereo_swap_eyes.GetValue());
         break;
+    case SDL_SCANCODE_F12:
+        v.stereo_flip_depth.SetValue(!v.stereo_flip_depth.GetValue());
+        break;
     case SDL_SCANCODE_F11:
         if (v.stereo_3d.GetValue() == Settings::Stereo3D::Off) {
             v.stereo_3d.SetValue(last_mode);
@@ -181,11 +185,11 @@ bool HandleStereoHotkey(int key) {
         return false;
     }
     static constexpr const char* depth_names[] = {"auto", "standard", "reversed", "show depth"};
-    LOG_INFO(Frontend, "Stereo: mode={} depth={} convergence={} format={} swap={}",
+    LOG_INFO(Frontend, "Stereo: mode={} depth={} convergence={} format={} swap={} flip={}",
              static_cast<int>(v.stereo_3d.GetValue()), v.stereo_separation.GetValue(),
              v.stereo_convergence.GetValue(),
              depth_names[static_cast<int>(v.stereo_depth.GetValue()) % 4],
-             v.stereo_swap_eyes.GetValue());
+             v.stereo_swap_eyes.GetValue(), v.stereo_flip_depth.GetValue());
     return true;
 }
 } // namespace
